@@ -158,6 +158,25 @@ class AgentRolloutEngine(ABC):
     def generate_batch(self, data_samples: list[dict]) -> Iterator[list[dict]]: ...
 ```
 
+### SearchController (search/)
+
+Keeps several candidate formulas alive and chooses between them on data the proposer never saw.
+Where `FormulaOptimizer.step()` commits every edit, a search evaluates a parent and its child on the
+*same* items, gates on that paired comparison, and scores only admitted candidates on a held-out
+split. Parent selection, item sampling, the gate and stopping are callables, so a different strategy
+is a different function.
+
+```python
+class SearchController:
+    def __init__(self, seed: Candidate, generator: CandidateGenerator,
+                 engine: AgentRolloutEngine, reward_fn: RewardFunction,
+                 feedback_items: Sequence[str], selection_items: Sequence[str],
+                 parent_selection=..., item_sampling=..., gate=..., stopping=...): ...
+    def run(self, max_iterations: int | None = None) -> SearchResult: ...
+```
+
+See the [Search user guide](docs/user-guide/search.md).
+
 ## Package Structure
 
 ```
@@ -192,7 +211,15 @@ strands_harness_optimizer/
 │   ├── agent_rollout_engine.py    # AgentRolloutEngine ABC
 │   ├── parallel_engine.py         # ParallelAgentRolloutEngine (utilities)
 │   ├── local_engine.py            # LocalRolloutEngine
+│   ├── replay_engine.py           # ReplayRolloutEngine (serves recorded rollouts)
 │   └── agentcore_engine.py        # AgentCoreRolloutEngine
+├── search/                         # Candidate search over formula versions
+│   ├── candidate.py                # Candidate (immutable snapshot + lineage)
+│   ├── evaluation.py               # EvaluationStore, EvaluationRecord, RolloutStatus
+│   ├── controller.py               # SearchController, CandidateGenerator
+│   ├── policies.py                 # parent selection, sampling, gate, stopping
+│   ├── views.py                    # FeedbackView: what the proposer may see
+│   └── guards.py                   # checks on a proposal before it costs rollouts
 ├── templates/                      # Jinja2 templates for optimizers
 │   └── contrastive_reflection/
 │       ├── system_prompt.jinja
